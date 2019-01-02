@@ -22,15 +22,12 @@ app.get('/', function (req,res){
 	res.send('Hello World');
 });
 
-app.get('/pokemon/{name}', function(req,res)) {
-
-var query = Pokemon.find({'name.english': req.query.name});
-
-query.exec(function(err,docs){
-	console.log(docs[0]);
+app.get('/pokemon/:name', function(req,res){
+	var query = Pokemon.find({'name.english': req.params.name});
+	query.exec(function(err,docs){
+		res.send(docs[0]);
+	});
 });
-
-}
 
 app.listen(3000,function(){
 	console.log('Listening on port 3000');
