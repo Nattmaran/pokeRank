@@ -7,5 +7,3 @@ mongoose.Promise = global.Promise;
 var db = mongoose.connection;
 //bind to error event
 db.on('error', console.error.bind(console, 'MongoDb connection error'));
-
-

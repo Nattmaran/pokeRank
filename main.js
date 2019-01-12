@@ -1,4 +1,5 @@
 var express = require('express');
+var path = require('path');
 var mongoose = require('mongoose');
 var bodyParser = require('body-parser');
 var _ = require('lodash');
@@ -11,7 +12,16 @@ var db = mongoose.connection;
 //bind to error event
 db.on('error', console.error.bind(console, 'MongoDb connection error'));
 var app = express();
+
 app.use(bodyParser.json());
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
+
+var dir = path.join(__dirname, 'public');
+app.use(express.static(dir));
 
 var Pokemon = require('./models/Pokemon');
 var Player = require('./models/Player');
@@ -24,13 +34,23 @@ app.get('/', function (req, res) {
 });
 
 
-app.get('/pokemon/:name', function (req, res) {
-    var query = Pokemon.find({'name.english': req.params.name});
+app.get('/pokemon/name/:name', function (req, res) {
+    console.log("Calling get pokemon with name"); console.log(JSON.stringify(req.params.name));
+    var query = Pokemon.find({'name.english': {$regex : "^" + req.params.name}});
+
     query.exec(function (err, docs) {
-        res.send(docs[0]);
+        res.send(buildResponseList(docs));
     });
 });
 
+app.get('/pokemon/id/:id', function (req, res) {
+    console.log("Calling get pokemon with id"); console.log(JSON.stringify(req.params.id));
+    var query = Pokemon.find({'id': req.params.id});
+
+    query.exec(function (err, docs) {
+        res.send(buildResponseWithThumbnail(docs[0]));
+    });
+});
 
 app.get('/player/:name', function (req, res) {
     var query = PartyPokemon.find({'player_name': req.params.name});
@@ -99,14 +119,42 @@ app.post('/registerBattle', function (request, res) {
 });
 
 function registerBattle(player, front, back, opponent, win) {
-    /*    console.log("=======ENTER REGISTER=======");
-        console.log(player);
-        console.log(front);
-        console.log(back);
-        console.log(opponent);
-        console.log(win);*/
+    var battleStatFind = {
+        player_name: player,
+        p1_id: front[0].pokemon_id,
+        p2_id: front[1].pokemon_id,
+        p3_id: back[0].pokemon_id,
+        p4_id: back[1].pokemon_id,
+        opponent_id: opponent.pokemon_id
+    };
 
-    var battleStat = {
+    if (win) {
+        BattleStats.findOneAndUpdate(battleStatFind, {$inc: {'stats.wins': 1}})
+            .exec(function (err, rowsAffected) {
+                if(err) {
+                    console.log("Error NONONO!");
+                }
+
+                if(rowsAffected == undefined) {
+                    createNewBattleStats(player, front, back, opponent, win);
+                } else {
+                    console.log("updated wins +1");
+                }
+            });
+    } else {
+        BattleStats.findOneAndUpdate(battleStatFind, {$inc: {'stats.losses': 1}})
+            .exec(function (err, rowsAffected) {
+                if(rowsAffected < 1) {
+                    createNewBattleStats(player, front, back, opponent, win);
+                } else {
+                    console.log("updated losses +1");
+                }
+            });
+    }
+}
+
+function createNewBattleStats(player, front, back, opponent, win) {
+    var battleStatNew = new BattleStats({
         player_name: player,
         p1_id: front[0].pokemon_id,
         p2_id: front[1].pokemon_id,
@@ -117,25 +165,45 @@ function registerBattle(player, front, back, opponent, win) {
             wins: win === true ? 1 : 0,
             losses: win === true ? 0 : 1
         }
-    };
+    });
 
-    BattleStats.find(battleStat,'p1_id p2_id p3_id p4_id opponent_id').exec(function (err, docs) {
-        if (docs[0] == undefined) {
-            new BattleStats(battleStat).save(function (err, docs) {
-                if (err) {
-                    return null;
-                }
-            });
+    battleStatNew.save(function (err,res) {
+        if(err) {
+            console.log("failed to insert new battle stat");
         } else {
-            BattleStats.update({
-                _id: docs[0]._id,
-                wins: docs[0].stats.wins + (win == true ? 1 : 0),
-                losses: docs[0].stats.losses + (win == true ? 0 : 1)
-            });
+            console.log("inserted new battlestat");
         }
-
-        return battleStat;
     });
 }
 
-app.listen(3000, () => console.log(`Example app listening on port 3000!`));
+function toPokemonThumbnail(id,name){
+    var idString = "000"+id;
+    idString = idString.substring(idString.length-3);
+    return path.join('thumbnails',idString+name+'.png')
+}
+
+function toPokemonSprite(id){
+    var idString = "000"+id;
+    idString = idString.substring(idString.length-3);
+    return path.join('sprites',idString+'MS'+'.png')
+}
+
+function buildResponseWithThumbnail(pokemon) {
+    var filePath = toPokemonThumbnail(pokemon.get("id"),pokemon.get("name.english"));
+    return {pokemon,thumbnail:filePath};
+}
+
+function buildResponseWithSprite(pokemon) {
+    var filePath = toPokemonSprite(pokemon.get("id"),pokemon.get("name.english"));
+    return {pokemon,sprite:filePath};
+}
+
+function buildResponseList(pokemons) {
+    var results = [];
+    _.forEach(pokemons, function (pokemon, n) {
+        results.push(buildResponseWithSprite(pokemon))
+    });
+    return {pokemonList:results};
+}
+
+app.listen(3001, () => console.log(`Example app listening on port 3001!`));
