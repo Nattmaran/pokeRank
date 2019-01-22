@@ -9,6 +9,6 @@ var Pokemon = new mongoose.Schema({
     },
     type: Object,
     base: Object
-}, { collection: 'pokedex'});
+}, { collection: 'pokemon'});
 
-module.exports = mongoose.model('Pokedex',Pokemon);
+module.exports = mongoose.model('Pokemon',Pokemon);

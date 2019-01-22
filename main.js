@@ -4,7 +4,7 @@ var mongoose = require('mongoose');
 var bodyParser = require('body-parser');
 var _ = require('lodash');
 
-var mongodb = "mongodb://localhost:27017/pokemon";
+var mongodb = "mongodb://mongodb:27017/pokemon";
 mongoose.connect(mongodb);
 mongoose.Promise = global.Promise;
 //connect
