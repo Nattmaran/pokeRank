@@ -2,7 +2,7 @@ version: "2"
 services:
     mongodb:
         container_name: mongo
-        image: mongo
+        image: mongo:latest
         volumes:
             - ./data:/data/db
         ports:
@@ -12,6 +12,10 @@ services:
         build: ./mongo-seed
         links:
             - mongodb
+        depends_on:
+            - mongodb
+        environment:
+            WAIT_HOSTS: mongodb:27017
     app:
         container_name: pokerank_app
         restart: always
